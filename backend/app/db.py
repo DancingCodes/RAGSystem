@@ -1,5 +1,3 @@
-# 已人工审读
-
 import os
 from contextlib import contextmanager
 from typing import Iterator

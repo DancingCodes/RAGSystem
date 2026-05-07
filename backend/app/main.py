@@ -1,5 +1,3 @@
-# 已人工审读
-
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI
