@@ -28,7 +28,6 @@ class Base(DeclarativeBase):
     pass
 
 
-# 将生成器函数包装成上下文管理器
 @contextmanager
 def get_session() -> Iterator[Session]:
     session = SessionLocal()

@@ -5,4 +5,5 @@ router = APIRouter()
 
 @router.get("/api/health")
 def health():
-    return {"ok": True}
+  return {"ok": True}
+
