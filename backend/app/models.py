@@ -49,4 +49,3 @@ class Chunk(Base):
   created_at: Mapped[dt.datetime] = mapped_column(
     DateTime(timezone=True), default=_utcnow, nullable=False
   )
-

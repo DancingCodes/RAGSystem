@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -15,7 +17,7 @@ class KnowledgeBaseCreateIn(BaseModel):
 class UploadedFileOut(BaseModel):
   id: str
   file_name: str
-  status: str | None = None
+  status: Optional[str] = None
 
 
 class ChatIn(BaseModel):
@@ -26,11 +28,10 @@ class ChatIn(BaseModel):
 
 class CitationOut(BaseModel):
   file_name: str
-  page_number: int | None = None
-  text: str | None = None
+  page_number: Optional[int] = None
+  text: Optional[str] = None
 
 
 class ChatOut(BaseModel):
   answer: str
   citations: list[CitationOut] = []
-

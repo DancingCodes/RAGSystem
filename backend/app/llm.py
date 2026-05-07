@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import math
 import os
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 
@@ -10,19 +11,40 @@ def _env(name: str) -> str:
   return os.getenv(name, "").strip()
 
 
-def llm_enabled() -> bool:
-  return bool(_env("OPENAI_API_KEY") and _env("OPENAI_MODEL"))
+def _deepseek_base_url() -> str:
+  base_url = "https://api.deepseek.com/v1"
+  return base_url[:-1] if base_url.endswith("/") else base_url
 
 
-async def generate_answer(*, question: str, context: str) -> str | None:
-  if not llm_enabled():
+def embedding_enabled() -> bool:
+  return bool(_env("DEEPSEEK_API_KEY"))
+
+
+def embedding_model() -> str:
+  return "deepseek-embedding"
+
+
+def chat_model() -> str:
+  return "deepseek-chat"
+
+
+def _normalize(vec: list[float]) -> list[float]:
+  s = 0.0
+  for v in vec:
+    s += float(v) * float(v)
+  n = math.sqrt(s)
+  if n <= 0:
+    return vec
+  return [float(v) / n for v in vec]
+
+
+async def generate_answer(*, question: str, context: str) -> Optional[str]:
+  if not embedding_enabled():
     return None
 
-  base_url = _env("OPENAI_BASE_URL") or "https://api.openai.com/v1"
-  if base_url.endswith("/"):
-    base_url = base_url[:-1]
-  model = _env("OPENAI_MODEL")
-  api_key = _env("OPENAI_API_KEY")
+  base_url = _deepseek_base_url()
+  model = chat_model()
+  api_key = _env("DEEPSEEK_API_KEY")
 
   payload: dict[str, Any] = {
     "model": model,
@@ -50,3 +72,33 @@ async def generate_answer(*, question: str, context: str) -> str | None:
     content = data["choices"][0]["message"]["content"]
     return content if isinstance(content, str) else None
 
+
+async def embed_texts(*, texts: list[str]) -> Optional[list[list[float]]]:
+  if not embedding_enabled():
+    return None
+
+  base_url = _deepseek_base_url()
+  api_key = _env("DEEPSEEK_API_KEY")
+  model = embedding_model()
+  payload: dict[str, Any] = {"model": model, "input": texts}
+
+  async with httpx.AsyncClient(timeout=60) as client:
+    res = await client.post(
+      f"{base_url}/embeddings",
+      headers={"Authorization": f"Bearer {api_key}"},
+      json=payload,
+    )
+    res.raise_for_status()
+    data = res.json()
+
+  items = data.get("data")
+  if not isinstance(items, list):
+    return None
+
+  out: list[list[float]] = []
+  for it in items:
+    emb = it.get("embedding") if isinstance(it, dict) else None
+    if not isinstance(emb, list):
+      return None
+    out.append(_normalize([float(x) for x in emb]))
+  return out

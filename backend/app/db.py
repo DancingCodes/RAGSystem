@@ -9,16 +9,17 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
 def _db_url() -> str:
-  url = os.getenv("DATABASE_URL", "").strip()
-  if url:
-    return url
-  base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-  data_dir = os.path.join(base_dir, "data")
-  os.makedirs(data_dir, exist_ok=True)
-  return f"sqlite:///{os.path.join(data_dir, 'app.db')}"
+  dsn = os.getenv("DB_DSN", "").strip()
+  if dsn:
+    if "://" not in dsn:
+      raise ValueError('Invalid DB_DSN. Expected a SQLAlchemy URL like "mysql+pymysql://user:pass@host:3306/db?charset=utf8mb4"')
+    return dsn
+
+  raise ValueError("DB_DSN required")
 
 
-engine = create_engine(_db_url(), connect_args={"check_same_thread": False})
+db_url = _db_url()
+engine = create_engine(db_url, pool_pre_ping=True)
 SessionLocal = sessionmaker(
   bind=engine, autoflush=False, autocommit=False, expire_on_commit=False
 )
