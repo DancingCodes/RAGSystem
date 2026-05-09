@@ -1,7 +1,14 @@
 "use client";
 
 import { chat, listKnowledgeBases } from "@/lib/api";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function ChatPage() {
   const [kbs, setKbs] = useState<Array<{ id: string; name: string }>>([]);
@@ -14,6 +21,22 @@ export default function ChatPage() {
   const [citations, setCitations] = useState<
     Array<{ file_name: string; page_number?: number; text?: string }>
   >([]);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await listKnowledgeBases();
+        setKbs(data);
+        if (data.length > 0) setKbId(data[0]!.id);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   const canSend = useMemo(
     () => Boolean(kbId) && question.trim().length > 0 && !sending,
@@ -54,33 +77,31 @@ export default function ChatPage() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-zinc-200 bg-white p-6">
+      <div className="rounded-xl border bg-card p-6">
         <h1 className="text-lg font-semibold tracking-tight">问答</h1>
-        <p className="mt-2 text-sm text-zinc-600">
+        <p className="mt-2 text-sm text-muted-foreground">
           选择知识库后提问，系统会检索相关片段并生成答案。
         </p>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <label className="space-y-1">
-            <div className="text-xs font-medium text-zinc-700">知识库</div>
-            <select
-              value={kbId}
-              onChange={(e) => setKbId(e.target.value)}
-              disabled={loading || kbs.length === 0}
-              className="h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-200 disabled:opacity-60"
-            >
-              {kbs.map((kb) => (
-                <option key={kb.id} value={kb.id}>
-                  {kb.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="space-y-1">
+            <div className="text-xs font-medium">知识库</div>
+            <Select value={kbId} onValueChange={(v) => setKbId(v ?? "")} disabled={loading || kbs.length === 0}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="选择知识库" />
+              </SelectTrigger>
+              <SelectContent>
+                {kbs.map((kb) => (
+                  <SelectItem key={kb.id} value={kb.id}>{kb.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex items-end">
             <button
               type="button"
               onClick={() => void loadKbs()}
-              className="h-10 w-full rounded-md border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-900 hover:bg-zinc-50 disabled:opacity-60"
+              className="h-10 w-full rounded-md border bg-card px-4 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-60"
               disabled={loading}
             >
               刷新知识库
@@ -89,19 +110,19 @@ export default function ChatPage() {
         </div>
 
         <div className="mt-3 space-y-2">
-          <div className="text-xs font-medium text-zinc-700">问题</div>
+          <div className="text-xs font-medium">问题</div>
           <textarea
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder="例如：这个产品的保修期是多久？"
-            className="min-h-28 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-200"
+            className="min-h-28 w-full rounded-md border bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
           />
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
               type="button"
               onClick={() => void onSend()}
               disabled={!canSend}
-              className="h-10 rounded-md bg-zinc-900 px-4 text-sm font-medium text-white disabled:opacity-60"
+              className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
             >
               {sending ? "生成中…" : "发送"}
             </button>
@@ -113,7 +134,7 @@ export default function ChatPage() {
                 setCitations([]);
                 setError(null);
               }}
-              className="h-10 rounded-md border border-zinc-200 bg-white px-4 text-sm font-medium text-zinc-900 hover:bg-zinc-50"
+              className="h-10 rounded-md border bg-card px-4 text-sm font-medium text-foreground hover:bg-accent"
             >
               清空
             </button>
@@ -121,41 +142,41 @@ export default function ChatPage() {
         </div>
 
         {error ? (
-          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
             后端未就绪或请求失败：{error}
           </div>
         ) : null}
       </div>
 
-      <div className="rounded-xl border border-zinc-200 bg-white">
-        <div className="border-b border-zinc-200 px-6 py-3 text-sm font-medium text-zinc-900">
+      <div className="rounded-xl border bg-card">
+        <div className="border-b px-6 py-3 text-sm font-medium text-foreground">
           回答
         </div>
         <div className="px-6 py-4">
           {answer ? (
-            <div className="whitespace-pre-wrap text-sm leading-6 text-zinc-900">
+            <div className="whitespace-pre-wrap text-sm leading-6 text-foreground">
               {answer}
             </div>
           ) : (
-            <div className="text-sm text-zinc-600">暂无回答</div>
+            <div className="text-sm text-muted-foreground">暂无回答</div>
           )}
           {citations.length > 0 ? (
             <div className="mt-5 space-y-2">
-              <div className="text-xs font-medium text-zinc-700">引用</div>
+              <div className="text-xs font-medium">引用</div>
               <ul className="space-y-2">
                 {citations.map((c, idx) => (
                   <li
                     key={`${c.file_name}-${c.page_number ?? "na"}-${idx}`}
-                    className="rounded-md border border-zinc-200 px-3 py-2 text-xs text-zinc-700"
+                    className="rounded-md border px-3 py-2 text-xs text-muted-foreground"
                   >
-                    <div className="font-medium text-zinc-900">
+                    <div className="font-medium text-foreground">
                       {c.file_name}
                       {typeof c.page_number === "number"
                         ? ` · 第 ${c.page_number} 页`
                         : ""}
                     </div>
                     {c.text ? (
-                      <div className="mt-1 whitespace-pre-wrap text-zinc-600">
+                      <div className="mt-1 whitespace-pre-wrap text-muted-foreground">
                         {c.text}
                       </div>
                     ) : null}

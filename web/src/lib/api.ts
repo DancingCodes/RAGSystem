@@ -8,7 +8,6 @@ export type KnowledgeBase = {
 export type UploadedFile = {
   id: string;
   file_name: string;
-  status?: string;
 };
 
 export type ChatResponse = {
@@ -21,12 +20,12 @@ export type ChatResponse = {
 };
 
 export async function listKnowledgeBases(): Promise<KnowledgeBase[]> {
-  return api.get("api/knowledge-bases").json();
+  return api.get("/api/knowledge-bases").json();
 }
 
 export async function createKnowledgeBase(name: string): Promise<KnowledgeBase> {
   return api
-    .post("api/knowledge-bases", { json: { name } })
+    .post("/api/knowledge-bases", { json: { name } })
     .json();
 }
 
@@ -37,10 +36,9 @@ export async function addDocument(params: {
   const form = new FormData();
   form.append("file", params.file);
   form.append("knowledge_base_id", params.knowledgeBaseId);
-  form.append("file_name", params.file.name);
 
   return api
-    .post("api/documents", {
+    .post("/api/documents", {
       body: form,
       timeout: 120000,
     })
@@ -52,7 +50,7 @@ export async function chat(params: {
   question: string;
 }): Promise<ChatResponse> {
   return api
-    .post("api/chat", {
+    .post("/api/chat", {
       json: {
         knowledge_base_id: params.knowledgeBaseId,
         question: params.question,
