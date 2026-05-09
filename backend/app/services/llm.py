@@ -1,24 +1,17 @@
-import asyncio
 import json
 from collections.abc import AsyncGenerator
-from typing import Any, Optional
+from typing import Any
 
 import httpx
-from sentence_transformers import SentenceTransformer
 
 from ..utils.env import env
 
-_embedding_model: Optional[SentenceTransformer] = None
 
-
-def _get_embedding_model() -> SentenceTransformer:
-    global _embedding_model
-    model = _embedding_model
-    if model is not None:
-        return model
-    model = SentenceTransformer("BAAI/bge-small-zh-v1.5")
-    _embedding_model = model
-    return model
+def _embedding_api_url() -> str:
+    url = env("EMBEDDING_API_URL")
+    if not url:
+        raise RuntimeError("EMBEDDING_API_URL is not set")
+    return url
 
 
 def chat_enabled() -> bool:
@@ -91,6 +84,15 @@ async def generate_answer_stream(
 
 
 async def embed_texts(*, texts: list[str]) -> list[list[float]]:
-    model = _get_embedding_model()
-    embeddings = await asyncio.to_thread(model.encode, texts, normalize_embeddings=True)
-    return [vec.tolist() for vec in embeddings]
+    url = f"{_embedding_api_url()}/embeddings"
+    model = env("EMBEDDING_MODEL")
+    if not model:
+        raise RuntimeError("EMBEDDING_MODEL is not set")
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.post(
+            url,
+            json={"input": texts, "model": model},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    return [item["embedding"] for item in data["data"]]

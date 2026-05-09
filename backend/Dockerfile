@@ -1,12 +1,13 @@
-FROM golang:1.25-alpine AS builder
-WORKDIR /app
-COPY go.mod go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod go mod download
-COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o backend ./cmd/server/main.go
+FROM python:3.12-slim
 
-FROM alpine:latest
 WORKDIR /app
-COPY --from=builder /app/backend .
+
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
 EXPOSE 10005
-CMD ["./backend"]
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "10005", "--workers", "1"]
