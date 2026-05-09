@@ -1,8 +1,6 @@
 from pathlib import Path
 from typing import Any
 
-import httpx
-
 from ..db import get_session
 from ..models import Chunk, FileRecord
 from .llm import embed_texts, embedding_enabled
@@ -51,12 +49,6 @@ def uploads_dir() -> Path:
   uploads.mkdir(parents=True, exist_ok=True)
   return uploads
 
-
-async def download_from_url(*, url: str, out_path: Path) -> None:
-    async with httpx.AsyncClient(timeout=120, follow_redirects=True) as client:
-        res = await client.get(url)
-        res.raise_for_status()
-        out_path.write_bytes(res.content)
 
 
 async def process_pdf(file_id: str) -> None:

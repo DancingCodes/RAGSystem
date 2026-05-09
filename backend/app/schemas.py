@@ -1,5 +1,14 @@
-from typing import Optional
+from typing import Any, Generic, Optional, TypeVar
+
 from pydantic import BaseModel, Field
+
+T = TypeVar("T")
+
+
+class ApiResponse(BaseModel, Generic[T]):
+    code: int
+    data: Optional[T] = None
+    msg: str = "ok"
 
 
 class KnowledgeBaseOut(BaseModel):
@@ -19,7 +28,6 @@ class UploadedFileOut(BaseModel):
 
 class DocumentAddIn(BaseModel):
     knowledge_base_id: str = Field(min_length=1)
-    file_url: str = Field(min_length=1)
     file_name: str = Field(min_length=1, max_length=500)
 
 

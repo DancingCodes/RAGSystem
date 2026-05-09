@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/lib/env";
+import { api } from "@/lib/http";
 
 export type KnowledgeBase = {
   id: string;
@@ -20,80 +20,44 @@ export type ChatResponse = {
   }>;
 };
 
-async function request<T>(
-  path: string,
-  init?: RequestInit & { timeoutMs?: number },
-): Promise<T> {
-  const { timeoutMs, ...rest } = init ?? {};
-  const controller = new AbortController();
-  const timer =
-    typeof timeoutMs === "number"
-      ? setTimeout(() => controller.abort(), timeoutMs)
-      : undefined;
-
-  try {
-    const res = await fetch(`${API_BASE_URL}${path}`, {
-      ...rest,
-      signal: controller.signal,
-      headers: {
-        ...(rest.headers ?? {}),
-      },
-    });
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(
-        `HTTP ${res.status} ${res.statusText}${text ? `: ${text}` : ""}`,
-      );
-    }
-    return (await res.json()) as T;
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
-
 export async function listKnowledgeBases(): Promise<KnowledgeBase[]> {
-  return request<KnowledgeBase[]>("/api/knowledge-bases", { timeoutMs: 8000 });
+  return api.get("api/knowledge-bases").json();
 }
 
 export async function createKnowledgeBase(name: string): Promise<KnowledgeBase> {
-  return request<KnowledgeBase>("/api/knowledge-bases", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
-    timeoutMs: 10000,
-  });
+  return api
+    .post("api/knowledge-bases", { json: { name } })
+    .json();
 }
 
 export async function addDocument(params: {
   knowledgeBaseId: string;
-  fileUrl: string;
-  fileName: string;
+  file: File;
 }): Promise<UploadedFile> {
-  return request<UploadedFile>("/api/documents", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      knowledge_base_id: params.knowledgeBaseId,
-      file_url: params.fileUrl,
-      file_name: params.fileName,
-    }),
-    timeoutMs: 120000,
-  });
+  const form = new FormData();
+  form.append("file", params.file);
+  form.append("knowledge_base_id", params.knowledgeBaseId);
+  form.append("file_name", params.file.name);
+
+  return api
+    .post("api/documents", {
+      body: form,
+      timeout: 120000,
+    })
+    .json();
 }
 
 export async function chat(params: {
   knowledgeBaseId: string;
   question: string;
 }): Promise<ChatResponse> {
-  return request<ChatResponse>("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      knowledge_base_id: params.knowledgeBaseId,
-      question: params.question,
-    }),
-    timeoutMs: 60000,
-  });
+  return api
+    .post("api/chat", {
+      json: {
+        knowledge_base_id: params.knowledgeBaseId,
+        question: params.question,
+      },
+      timeout: 60000,
+    })
+    .json();
 }
-
