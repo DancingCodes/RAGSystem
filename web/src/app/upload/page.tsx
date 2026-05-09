@@ -1,20 +1,24 @@
 "use client";
 
-import { listKnowledgeBases, uploadPdf } from "@/lib/api";
+import { addDocument, listKnowledgeBases } from "@/lib/api";
 import { useMemo, useState } from "react";
+
+const FILEHUB_UPLOAD_URL = "https://filehub.moonc.love/api/upload";
+
+type Stage = "idle" | "uploading_filehub" | "registering_rag";
 
 export default function UploadPage() {
   const [kbs, setKbs] = useState<Array<{ id: string; name: string }>>([]);
   const [kbId, setKbId] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [stage, setStage] = useState<Stage>("idle");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
 
   const canUpload = useMemo(
-    () => Boolean(kbId) && Boolean(file) && !uploading,
-    [file, kbId, uploading],
+    () => Boolean(kbId) && Boolean(file) && stage === "idle",
+    [file, kbId, stage],
   );
 
   async function loadKbs() {
@@ -33,19 +37,55 @@ export default function UploadPage() {
 
   async function onUpload() {
     if (!kbId || !file) return;
-    setUploading(true);
     setError(null);
     setResult(null);
+
+    // Stage 1: upload to filehub
+    setStage("uploading_filehub");
+    const form = new FormData();
+    form.append("file", file);
+    let fileUrl = "";
+    let fileName = file.name;
+
     try {
-      const res = await uploadPdf({ knowledgeBaseId: kbId, file });
+      const res = await fetch(FILEHUB_UPLOAD_URL, {
+        method: "POST",
+        body: form,
+      });
+      if (!res.ok) throw new Error(`filehub HTTP ${res.status}`);
+      const json = await res.json();
+      if (json.code !== 200) throw new Error(json.msg ?? "filehub upload failed");
+      fileUrl = json.data?.file_url ?? "";
+      fileName = json.data?.file_name ?? fileName;
+      if (!fileUrl) throw new Error("filehub returned empty file_url");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setStage("idle");
+      return;
+    }
+
+    // Stage 2: register with RAG backend
+    setStage("registering_rag");
+    try {
+      const res = await addDocument({
+        knowledgeBaseId: kbId,
+        fileUrl,
+        fileName,
+      });
       setResult(`已提交：${res.file_name}（id=${res.id}${res.status ? `, status=${res.status}` : ""}）`);
       setFile(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setUploading(false);
+      setStage("idle");
     }
   }
+
+  const stageLabel: Record<Stage, string> = {
+    idle: "开始上传",
+    uploading_filehub: "上传到文件服务…",
+    registering_rag: "注册到 RAG…",
+  };
 
   return (
     <div className="space-y-6">
@@ -90,7 +130,7 @@ export default function UploadPage() {
             disabled={!canUpload}
             className="h-10 rounded-md bg-zinc-900 px-4 text-sm font-medium text-white disabled:opacity-60"
           >
-            {uploading ? "上传中…" : "开始上传"}
+            {stageLabel[stage]}
           </button>
           <button
             type="button"
@@ -103,7 +143,7 @@ export default function UploadPage() {
 
         {error ? (
           <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            后端未就绪或请求失败：{error}
+            失败：{error}
           </div>
         ) : null}
         {result ? (

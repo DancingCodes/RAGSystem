@@ -17,6 +17,12 @@ class UploadedFileOut(BaseModel):
     status: Optional[str] = None
 
 
+class DocumentAddIn(BaseModel):
+    knowledge_base_id: str = Field(min_length=1)
+    file_url: str = Field(min_length=1)
+    file_name: str = Field(min_length=1, max_length=500)
+
+
 class ChatIn(BaseModel):
     knowledge_base_id: str = Field(min_length=1)
     question: str = Field(min_length=1)

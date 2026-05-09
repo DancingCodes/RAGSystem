@@ -65,18 +65,20 @@ export async function createKnowledgeBase(name: string): Promise<KnowledgeBase> 
   });
 }
 
-export async function uploadPdf(params: {
+export async function addDocument(params: {
   knowledgeBaseId: string;
-  file: File;
+  fileUrl: string;
+  fileName: string;
 }): Promise<UploadedFile> {
-  const form = new FormData();
-  form.append("knowledge_base_id", params.knowledgeBaseId);
-  form.append("file", params.file);
-
-  return request<UploadedFile>("/api/files", {
+  return request<UploadedFile>("/api/documents", {
     method: "POST",
-    body: form,
-    timeoutMs: 60000,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      knowledge_base_id: params.knowledgeBaseId,
+      file_url: params.fileUrl,
+      file_name: params.fileName,
+    }),
+    timeoutMs: 120000,
   });
 }
 

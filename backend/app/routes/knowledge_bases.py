@@ -6,8 +6,9 @@ from sqlalchemy import select
 from ..db import get_session
 from ..models import Chunk, FileRecord, KnowledgeBase
 from ..schemas import KnowledgeBaseCreateIn, KnowledgeBaseOut
-from ..services.llm import embed_texts, embedding_enabled
-from ..services.vector_store import build_point, ensure_collection, upsert_points, vector_store_enabled
+from ..services.ingest import batch_embed_and_upsert
+from ..services.llm import embedding_enabled
+from ..services.vector_store import vector_store_enabled
 
 router = APIRouter()
 
@@ -70,31 +71,19 @@ async def reindex_knowledge_base(knowledge_base_id: str):
     if not rows:
       return {"ok": True, "embedded": 0}
 
-    batch_size = 64
-    embedded = 0
-    for start in range(0, len(rows), batch_size):
-      batch = rows[start : start + batch_size]
-      texts = [str(x[1]) for x in batch]
-      vectors = await embed_texts(texts=texts)
-      if not vectors or len(vectors) != len(batch):
-        raise HTTPException(status_code=502, detail="embedding failed")
-
-      ensure_collection(vector_size=len(vectors[0]))
-      points = [
-        build_point(
-          chunk_id=int(row[0]),
-          vector=vec,
-          knowledge_base_id=kb_id,
-          file_id=str(row[4]),
-          file_name=str(row[5]),
-          page_number=int(row[2]),
-          chunk_index=int(row[3]),
-          text=str(row[1]),
-        )
-        for row, vec in zip(batch, vectors)
-      ]
-      upsert_points(points=points)
-      embedded += len(points)
+    items = [
+      {
+        "chunk_id": int(row[0]),
+        "text": str(row[1]),
+        "knowledge_base_id": kb_id,
+        "file_id": str(row[4]),
+        "file_name": str(row[5]),
+        "page_number": int(row[2]),
+        "chunk_index": int(row[3]),
+      }
+      for row in rows
+    ]
+    embedded = await batch_embed_and_upsert(items)
 
   return {"ok": True, "embedded": embedded}
 

@@ -5,7 +5,7 @@ from .db import Base, engine
 
 from .routes.chat import router as chat_router
 from .routes.files import router as files_router
-from .routes.health import router as health_router
+
 from .routes.knowledge_bases import router as knowledge_bases_router
 
 Base.metadata.create_all(bind=engine)
@@ -19,7 +19,7 @@ app.add_middleware(
   allow_headers=["*"],
 )
 
-app.include_router(health_router)
+
 app.include_router(knowledge_bases_router)
 app.include_router(files_router)
 app.include_router(chat_router)
