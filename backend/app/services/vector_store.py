@@ -83,6 +83,21 @@ def build_point(
   return PointStruct(id=int(chunk_id), vector=vector, payload=payload)
 
 
+def delete_by_kb(*, knowledge_base_id: str) -> None:
+  if not vector_store_enabled():
+    return
+  client = _client()
+  flt = Filter(
+    must=[
+      FieldCondition(
+        key="knowledge_base_id",
+        match=MatchValue(value=str(knowledge_base_id)),
+      )
+    ]
+  )
+  client.delete(collection_name=_collection(), points_selector=flt)
+
+
 def search(
   *,
   knowledge_base_id: str,

@@ -1,7 +1,18 @@
 "use client";
 
-import { createKnowledgeBase, listKnowledgeBases } from "@/lib/api";
+import { createKnowledgeBase, deleteKnowledgeBase, listKnowledgeBases } from "@/lib/api";
 import { useEffect, useMemo, useState } from "react";
+import { Loader2Icon, Trash2Icon } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function KnowledgeBasesPage() {
   const [items, setItems] = useState<Array<{ id: string; name: string }>>([]);
@@ -9,6 +20,8 @@ export default function KnowledgeBasesPage() {
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -39,6 +52,22 @@ export default function KnowledgeBasesPage() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function onDelete() {
+    if (!confirmDelete) return;
+    const { id } = confirmDelete;
+    setConfirmDelete(null);
+    setDeleting(id);
+    setError(null);
+    try {
+      await deleteKnowledgeBase(id);
+      setItems((prev) => prev.filter((it) => it.id !== id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDeleting(null);
     }
   }
 
@@ -114,13 +143,43 @@ export default function KnowledgeBasesPage() {
                   <div className="text-sm font-medium text-foreground">
                     {it.name}
                   </div>
-                  <div className="text-xs text-muted-foreground">{it.id}</div>
+                  <div className="flex items-center gap-3">
+                    {deleting === it.id ? (
+                      <Loader2Icon className="size-3.5 animate-spin text-muted-foreground" />
+                    ) : (
+                      <>
+                        <div className="text-xs text-muted-foreground">{it.id}</div>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDelete(it)}
+                          className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <Trash2Icon className="size-3.5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
           )}
         </div>
       </div>
+
+      <AlertDialog open={!!confirmDelete} onOpenChange={(open) => { if (!open) setConfirmDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              将删除知识库「{confirmDelete?.name}」及其包含的所有文件和数据，此操作不可撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void onDelete()}>确认删除</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

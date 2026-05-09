@@ -40,21 +40,8 @@ export default function UploadPage() {
     [file, kbId, uploading],
   );
 
-  async function loadKbs() {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await listKnowledgeBases();
-      setKbs(data);
-      if (!kbId && data.length > 0) setKbId(data[0]!.id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }
 
-  async function onUpload() {
+async function onUpload() {
     if (!kbId || !file) return;
     setError(null);
     setResult(null);
@@ -113,13 +100,6 @@ export default function UploadPage() {
             className="h-10 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
           >
             {uploading ? "上传中…" : "开始上传"}
-          </button>
-          <button
-            type="button"
-            onClick={() => void loadKbs()}
-            className="h-10 rounded-md border bg-card px-4 text-sm font-medium text-foreground hover:bg-accent"
-          >
-            刷新知识库
           </button>
         </div>
 

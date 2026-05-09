@@ -1,11 +1,18 @@
+import json
+
 from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 
 from ..data.db import get_session
-from ..utils.response import fail, ok
+from ..utils.response import fail
 from ..data.models import KnowledgeBase
-from ..data.schemas import ChatIn, ChatOut, CitationOut
-from ..services.llm import chat_enabled, embed_texts, generate_answer
+from ..data.schemas import ChatIn, CitationOut
+from ..services.llm import chat_enabled, embed_texts, generate_answer_stream
 from ..services.vector_store import search, vector_store_enabled
+
+def _sse(data: dict) -> str:
+    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
 
 router = APIRouter()
 
@@ -47,11 +54,31 @@ async def chat_api(payload: ChatIn):
         if (h.payload.get("file_name") and h.payload.get("text"))
     ]
 
+    citations = [
+        CitationOut(
+            file_name=str(c["file_name"]),
+            page_number=int(c["page_number"]),
+            text=str(c["text"])[:60],
+        )
+        for c in retrieved
+    ]
+
     if not retrieved:
-        return ok(ChatOut(
-            answer=f"当前知识库「{kb_name}」未检索到相关片段，建议换个问法或确认 PDF 是否已成功入库。",
-            citations=[],
-        ))
+        no_hit_answer = f"当前知识库「{kb_name}」未检索到相关片段，建议换个问法或确认 PDF 是否已成功入库。"
+
+        async def no_hit_stream():
+            yield _sse({"type": "token", "content": no_hit_answer})
+            yield _sse({"type": "done", "citations": []})
+
+        return StreamingResponse(
+            no_hit_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache, no-transform",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
 
     context = "\n\n".join(
         [
@@ -59,17 +86,22 @@ async def chat_api(payload: ChatIn):
             for i, c in enumerate(retrieved)
         ]
     )
-    llm = await generate_answer(question=question, context=context)
-    if not llm:
-        return fail("llm generate failed")
-    answer = llm
 
-    citations = [
-        CitationOut(
-            file_name=str(c["file_name"]),
-            page_number=int(c["page_number"]),
-            text=str(c["text"])[:500],
-        )
-        for c in retrieved
-    ]
-    return ok(ChatOut(answer=answer, citations=citations))
+    async def event_stream():
+        async for token in generate_answer_stream(question=question, context=context):
+            if token is None:
+                yield _sse({"type": "error", "message": "llm generate failed"})
+                return
+            yield _sse({"type": "token", "content": token})
+
+        yield _sse({"type": "done", "citations": [c.model_dump() for c in citations]})
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

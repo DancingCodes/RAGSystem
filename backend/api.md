@@ -72,6 +72,34 @@ PDF 上传 → 解析 → 分块 → Embedding (bge-small-zh-v1.5) → Qdrant �
 
 ---
 
+### 1.3 删除知识库
+
+`DELETE /api/knowledge-bases/{knowledge_base_id}`
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| knowledge_base_id | path (string) | 是 | 知识库 ID |
+
+> 同时删除该知识库下的所有文件、chunk 和 Qdrant 向量数据。
+
+**模拟请求：**
+
+```
+DELETE /api/knowledge-bases/a1b2c3d4e5f6a7b8
+```
+
+**响应示例：**
+
+```json
+{
+    "code": 200,
+    "msg": "ok",
+    "data": null
+}
+```
+
+---
+
 ## 2. 文档上传（同步处理）
 
 `POST /api/documents`

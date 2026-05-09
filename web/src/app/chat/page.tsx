@@ -1,6 +1,6 @@
 "use client";
 
-import { chat, listKnowledgeBases } from "@/lib/api";
+import { chatStream, listKnowledgeBases, type Citation } from "@/lib/api";
 import { useEffect, useMemo, useState } from "react";
 import {
   Select,
@@ -18,9 +18,7 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [citations, setCitations] = useState<
-    Array<{ file_name: string; page_number?: number; text?: string }>
-  >([]);
+  const [citations, setCitations] = useState<Citation[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -43,21 +41,8 @@ export default function ChatPage() {
     [kbId, question, sending],
   );
 
-  async function loadKbs() {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await listKnowledgeBases();
-      setKbs(data);
-      if (!kbId && data.length > 0) setKbId(data[0]!.id);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }
 
-  async function onSend() {
+async function onSend() {
     const q = question.trim();
     if (!kbId || !q) return;
     setSending(true);
@@ -65,9 +50,17 @@ export default function ChatPage() {
     setAnswer(null);
     setCitations([]);
     try {
-      const res = await chat({ knowledgeBaseId: kbId, question: q });
-      setAnswer(res.answer);
-      setCitations(res.citations ?? []);
+      let full = "";
+      for await (const ev of chatStream({ knowledgeBaseId: kbId, question: q })) {
+        if (ev.type === "token") {
+          full += ev.content;
+          setAnswer(full);
+        } else if (ev.type === "done") {
+          setCitations(ev.citations);
+        } else if (ev.type === "error") {
+          setError(ev.message);
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -83,30 +76,18 @@ export default function ChatPage() {
           选择知识库后提问，系统会检索相关片段并生成答案。
         </p>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1">
-            <div className="text-xs font-medium">知识库</div>
-            <Select value={kbId} onValueChange={(v) => setKbId(v ?? "")} disabled={loading || kbs.length === 0}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="选择知识库" />
-              </SelectTrigger>
-              <SelectContent>
-                {kbs.map((kb) => (
-                  <SelectItem key={kb.id} value={kb.id}>{kb.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-end">
-            <button
-              type="button"
-              onClick={() => void loadKbs()}
-              className="h-10 w-full rounded-md border bg-card px-4 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-60"
-              disabled={loading}
-            >
-              刷新知识库
-            </button>
-          </div>
+        <div className="mt-4 space-y-1">
+          <div className="text-xs font-medium">知识库</div>
+          <Select value={kbId} onValueChange={(v) => setKbId(v ?? "")} disabled={loading || kbs.length === 0}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="选择知识库" />
+            </SelectTrigger>
+            <SelectContent>
+              {kbs.map((kb) => (
+                <SelectItem key={kb.id} value={kb.id}>{kb.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="mt-3 space-y-2">
@@ -163,26 +144,19 @@ export default function ChatPage() {
           {citations.length > 0 ? (
             <div className="mt-5 space-y-2">
               <div className="text-xs font-medium">引用</div>
-              <ul className="space-y-2">
+              <div className="flex flex-wrap gap-2">
                 {citations.map((c, idx) => (
-                  <li
+                  <span
                     key={`${c.file_name}-${c.page_number ?? "na"}-${idx}`}
-                    className="rounded-md border px-3 py-2 text-xs text-muted-foreground"
+                    className="inline-flex items-center rounded-md border px-2.5 py-1 text-xs text-muted-foreground"
                   >
-                    <div className="font-medium text-foreground">
-                      {c.file_name}
-                      {typeof c.page_number === "number"
-                        ? ` · 第 ${c.page_number} 页`
-                        : ""}
-                    </div>
-                    {c.text ? (
-                      <div className="mt-1 whitespace-pre-wrap text-muted-foreground">
-                        {c.text}
-                      </div>
-                    ) : null}
-                  </li>
+                    {c.file_name}
+                    {typeof c.page_number === "number"
+                      ? ` · 第 ${c.page_number} 页`
+                      : ""}
+                  </span>
                 ))}
-              </ul>
+              </div>
             </div>
           ) : null}
         </div>
