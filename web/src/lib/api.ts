@@ -10,15 +10,6 @@ export type UploadedFile = {
   file_name: string;
 };
 
-export type ChatResponse = {
-  answer: string;
-  citations?: Array<{
-    file_name: string;
-    page_number?: number;
-    text?: string;
-  }>;
-};
-
 export type Citation = {
   file_name: string;
   page_number?: number;
@@ -56,21 +47,6 @@ export async function addDocument(params: {
     .post("/api/documents", {
       body: form,
       timeout: 120000,
-    })
-    .json();
-}
-
-export async function chat(params: {
-  knowledgeBaseId: string;
-  question: string;
-}): Promise<ChatResponse> {
-  return api
-    .post("/api/chat", {
-      json: {
-        knowledge_base_id: params.knowledgeBaseId,
-        question: params.question,
-      },
-      timeout: 60000,
     })
     .json();
 }

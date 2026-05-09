@@ -174,28 +174,29 @@ Content-Type: `multipart/form-data`
 2. Qdrant COSINE 相似度检索 → 取 top_k 条最相关 chunk
 3. 构建 context：拼接 [文件/页码/片段内容]（按相似度排序）
 4. System Prompt: "你是检索增强问答助手，只依据资料片段回答；不足时说明未找到依据"
-5. 调用 DeepSeek V3 (temperature=0.2) → 基于 context 生成答案
-6. 返回答案 + 引用列表（每条约 500 字符）
+5. 调用 DeepSeek V3 (temperature=0.2, stream=true) → 逐 token 生成答案
+6. 返回 SSE 流式响应
 ```
 
-**响应示例：**
+**响应格式（SSE）：**
 
-```json
-{
-    "code": 200,
-    "msg": "ok",
-    "data": {
-        "answer": "RAG系统主要由文档解析层、向量检索层和大模型生成层三部分组成...",
-        "citations": [
-            {
-                "file_name": "RAG设计文档.pdf",
-                "page_number": 3,
-                "text": "系统架构采用分层设计，包括..."
-            }
-        ]
-    }
-}
+Content-Type: `text/event-stream`
+
+| 事件类型 | 说明 | 示例 |
+|---------|------|------|
+| `token` | 答案文本片段 | `{"type":"token","content":"RAG系统"}` |
+| `done` | 生成完成，携带引用列表 | `{"type":"done","citations":[...]}` |
+| `error` | 生成失败 | `{"type":"error","message":"llm generate failed"}` |
+
 ```
+event: token
+data: {"type":"token","content":"RAG系统"}
+
+event: done
+data: {"type":"done","citations":[{"file_name":"RAG设计文档.pdf","page_number":3,"text":"系统架构采用分层设计"}]}
+```
+
+引用中 `text` 字段截取前 60 字符。
 
 ---
 

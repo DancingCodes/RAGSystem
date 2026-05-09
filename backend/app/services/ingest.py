@@ -9,9 +9,15 @@ from .vector_store import build_point, ensure_collection, upsert_points, vector_
 
 
 async def batch_embed_and_upsert(items: list[dict[str, Any]]) -> int:
-    """批处理 embedding 并写入向量库。items 需包含 chunk_id/text/knowledge_base_id/file_id/file_name/page_number/chunk_index。"""
+    """批处理 embedding 并写入向量库"""
     if not items:
         return 0
+
+    # Ensure collection exists once before the batch loop
+    first_text = items[0]["text"]
+    vecs = await embed_texts(texts=[first_text])
+    if vecs:
+        ensure_collection(vector_size=len(vecs[0]))
 
     batch_size = 64
     embedded = 0
@@ -22,7 +28,6 @@ async def batch_embed_and_upsert(items: list[dict[str, Any]]) -> int:
         if not vectors or len(vectors) != len(batch):
             continue
 
-        ensure_collection(vector_size=len(vectors[0]))
         points = [
             build_point(
                 chunk_id=item["chunk_id"],
@@ -43,62 +48,77 @@ async def batch_embed_and_upsert(items: list[dict[str, Any]]) -> int:
 
 
 def uploads_dir() -> Path:
-  base_dir = Path(__file__).resolve().parents[2]
-  data_dir = base_dir / "data"
-  uploads = data_dir / "uploads"
-  uploads.mkdir(parents=True, exist_ok=True)
-  return uploads
-
+    base_dir = Path(__file__).resolve().parents[2]
+    data_dir = base_dir / "data"
+    uploads = data_dir / "uploads"
+    uploads.mkdir(parents=True, exist_ok=True)
+    return uploads
 
 
 async def process_pdf(file_id: str) -> None:
-  with get_session() as session:
-    file_row = session.get(FileRecord, file_id)
-    if not file_row:
-      return
-    kb_id = str(file_row.knowledge_base_id)
-    path = str(file_row.storage_path)
-    file_name = str(file_row.file_name)
+    # Read metadata in its own session
+    with get_session() as session:
+        file_row = session.get(FileRecord, file_id)
+        if not file_row:
+            return
+        kb_id = str(file_row.knowledge_base_id)
+        path = str(file_row.storage_path)
+        file_name = str(file_row.file_name)
 
+    # Extract and chunk outside DB session
     try:
-      pages = extract_pdf_pages(path)
-      chunk_count = 0
-      added: list[Chunk] = []
-      for page_number, text in pages:
-        chunks = chunk_text(text)
-        for idx, c in enumerate(chunks):
-          row = Chunk(
-            knowledge_base_id=kb_id,
-            file_id=file_id,
-            page_number=page_number,
-            chunk_index=idx,
-            text=c,
-          )
-          session.add(row)
-          added.append(row)
-          chunk_count += 1
+        pages = extract_pdf_pages(path)
+        chunk_data: list[dict[str, Any]] = []
+        for page_number, text in pages:
+            for idx, c in enumerate(chunk_text(text)):
+                chunk_data.append({
+                    "page_number": page_number,
+                    "chunk_index": idx,
+                    "text": c,
+                })
 
-      session.flush()
+        # Write chunks in a fresh session (so IDs are auto-generated)
+        with get_session() as session:
+            file_row = session.get(FileRecord, file_id)
+            if not file_row:
+                return
 
-      if vector_store_enabled() and added:
-        items = [
-          {
-            "chunk_id": int(row.id),
-            "text": row.text,
-            "knowledge_base_id": kb_id,
-            "file_id": file_id,
-            "file_name": file_name,
-            "page_number": int(row.page_number),
-            "chunk_index": int(row.chunk_index),
-          }
-          for row in added
-        ]
-        await batch_embed_and_upsert(items)
+            added: list[Chunk] = []
+            for item in chunk_data:
+                row = Chunk(
+                    knowledge_base_id=kb_id,
+                    file_id=file_id,
+                    page_number=item["page_number"],
+                    chunk_index=item["chunk_index"],
+                    text=item["text"],
+                )
+                session.add(row)
+                added.append(row)
 
-      file_row.status = "succeeded" if chunk_count > 0 else "failed"
-      session.add(file_row)
+            session.flush()  # Populate auto-increment IDs
+
+            if vector_store_enabled() and added:
+                items = [
+                    {
+                        "chunk_id": int(row.id),
+                        "text": row.text,
+                        "knowledge_base_id": kb_id,
+                        "file_id": file_id,
+                        "file_name": file_name,
+                        "page_number": int(row.page_number),
+                        "chunk_index": int(row.chunk_index),
+                    }
+                    for row in added
+                ]
+                await batch_embed_and_upsert(items)
+
+            file_row.status = "succeeded" if chunk_data else "failed"
+
     except Exception:
-      file_row.status = "failed"
-      session.add(file_row)
-      raise
-
+        # Write failed status in a separate session so the rollback
+        # from the main session does not discard it
+        with get_session() as session:
+            fr = session.get(FileRecord, file_id)
+            if fr:
+                fr.status = "failed"
+        raise

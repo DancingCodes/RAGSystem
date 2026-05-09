@@ -19,6 +19,7 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [citations, setCitations] = useState<Citation[]>([]);
+  const [truncated, setTruncated] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -49,17 +50,23 @@ async function onSend() {
     setError(null);
     setAnswer(null);
     setCitations([]);
+    setTruncated(false);
     try {
       let full = "";
+      let receivedDone = false;
       for await (const ev of chatStream({ knowledgeBaseId: kbId, question: q })) {
         if (ev.type === "token") {
           full += ev.content;
           setAnswer(full);
         } else if (ev.type === "done") {
+          receivedDone = true;
           setCitations(ev.citations);
         } else if (ev.type === "error") {
           setError(ev.message);
         }
+      }
+      if (!receivedDone && full) {
+        setTruncated(true);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -80,7 +87,9 @@ async function onSend() {
           <div className="text-xs font-medium">知识库</div>
           <Select value={kbId} onValueChange={(v) => setKbId(v ?? "")} disabled={loading || kbs.length === 0}>
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="选择知识库" />
+              <SelectValue placeholder="选择知识库">
+                {(value: string) => kbs.find((kb) => kb.id === value)?.name ?? "选择知识库"}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {kbs.map((kb) => (
@@ -135,9 +144,16 @@ async function onSend() {
         </div>
         <div className="px-6 py-4">
           {answer ? (
-            <div className="whitespace-pre-wrap text-sm leading-6 text-foreground">
-              {answer}
-            </div>
+            <>
+              <div className="whitespace-pre-wrap text-sm leading-6 text-foreground">
+                {answer}
+              </div>
+              {truncated ? (
+                <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                  流式响应中断，回答可能不完整
+                </div>
+              ) : null}
+            </>
           ) : (
             <div className="text-sm text-muted-foreground">暂无回答</div>
           )}

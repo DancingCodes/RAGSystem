@@ -71,7 +71,9 @@ async function onUpload() {
             <div className="text-xs font-medium">知识库</div>
             <Select value={kbId} onValueChange={(v) => setKbId(v ?? "")} disabled={loading || kbs.length === 0}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="选择知识库" />
+                <SelectValue placeholder="选择知识库">
+                  {(value: string) => kbs.find((kb) => kb.id === value)?.name ?? "选择知识库"}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {kbs.map((kb) => (

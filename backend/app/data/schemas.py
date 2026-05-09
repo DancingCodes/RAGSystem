@@ -37,6 +37,3 @@ class CitationOut(BaseModel):
     text: Optional[str] = None
 
 
-class ChatOut(BaseModel):
-    answer: str
-    citations: list[CitationOut] = []

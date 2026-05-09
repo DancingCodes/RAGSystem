@@ -51,7 +51,7 @@ def chunk_text(
     p_len = len(p)
     if p_len > target_size:
       flush()
-      for s in _split_long(p, target_size=target_size, overlap=overlap):
+      for s in _split_long(p, target_size=target_size):
         chunks.append(s)
       continue
 
@@ -67,13 +67,12 @@ def chunk_text(
   return _apply_overlap(chunks, overlap=overlap)
 
 
-def _split_long(text: str, *, target_size: int, overlap: int) -> Iterable[str]:
-  step = max(1, target_size - overlap)
-  i = 0
-  n = len(text)
-  while i < n:
-    yield text[i : i + target_size].strip()
-    i += step
+def _split_long(text: str, *, target_size: int) -> Iterable[str]:
+    i = 0
+    n = len(text)
+    while i < n:
+        yield text[i : i + target_size].strip()
+        i += target_size
 
 
 def _apply_overlap(chunks: list[str], *, overlap: int) -> list[str]:

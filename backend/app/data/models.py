@@ -17,6 +17,12 @@ class KnowledgeBase(Base):
         default=_utcnow,
         nullable=False,
     )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_utcnow,
+        onupdate=_utcnow,
+        nullable=False,
+    )
 
 
 class FileRecord(Base):
@@ -36,13 +42,22 @@ class FileRecord(Base):
         default=_utcnow,
         nullable=False,
     )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_utcnow,
+        onupdate=_utcnow,
+        nullable=False,
+    )
 
 
 class Chunk(Base):
     __tablename__ = "chunks"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     knowledge_base_id: Mapped[str] = mapped_column(
-        String(36), index=True, nullable=False
+        String(36),
+        ForeignKey("knowledge_bases.id"),
+        index=True,
+        nullable=False,
     )
     file_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("files.id"), index=True, nullable=False
@@ -53,5 +68,11 @@ class Chunk(Base):
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True),
         default=_utcnow,
+        nullable=False,
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_utcnow,
+        onupdate=_utcnow,
         nullable=False,
     )

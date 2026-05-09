@@ -118,7 +118,7 @@ export default function KnowledgeBasesPage() {
           </button>
         </div>
         {error ? (
-          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
             后端未就绪或请求失败：{error}
           </div>
         ) : null}
