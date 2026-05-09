@@ -1,9 +1,9 @@
 from pathlib import Path
 from typing import Any
 
-from ..db import get_session
-from ..models import Chunk, FileRecord
-from .llm import embed_texts, embedding_enabled
+from ..data.db import get_session
+from ..data.models import Chunk, FileRecord
+from .llm import embed_texts
 from .pdf_ingest import chunk_text, extract_pdf_pages
 from .vector_store import build_point, ensure_collection, upsert_points, vector_store_enabled
 
@@ -56,9 +56,9 @@ async def process_pdf(file_id: str) -> None:
     file_row = session.get(FileRecord, file_id)
     if not file_row:
       return
-    kb_id = file_row.knowledge_base_id
-    path = file_row.storage_path
-    file_name = file_row.file_name
+    kb_id = str(file_row.knowledge_base_id)
+    path = str(file_row.storage_path)
+    file_name = str(file_row.file_name)
 
     try:
       pages = extract_pdf_pages(path)
@@ -80,7 +80,7 @@ async def process_pdf(file_id: str) -> None:
 
       session.flush()
 
-      if embedding_enabled() and vector_store_enabled() and added:
+      if vector_store_enabled() and added:
         items = [
           {
             "chunk_id": int(row.id),

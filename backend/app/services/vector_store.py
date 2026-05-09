@@ -38,7 +38,8 @@ def ensure_collection(*, vector_size: int) -> None:
   if any(c.name == name for c in collections):
     info = client.get_collection(name)
     cfg = info.config.params.vectors
-    if hasattr(cfg, "size") and int(cfg.size) != int(vector_size):
+    cfg_size = getattr(cfg, "size", None)
+    if isinstance(cfg_size, (int, float, str)) and int(cfg_size) != int(vector_size):
       raise ValueError("Qdrant collection vector size mismatch")
     return
 
@@ -112,6 +113,6 @@ def search(
     for p in res:
       out.append(VectorHit(id=int(p.id), score=float(p.score), payload=dict(p.payload or {})))
     return out
-  except Exception:
+  except (ConnectionError, OSError, ValueError):
     return None
 

@@ -1,10 +1,10 @@
 from fastapi import APIRouter
 
-from ..db import get_session
-from ..response import fail, ok
-from ..models import KnowledgeBase
-from ..schemas import ChatIn, ChatOut
-from ..services.llm import embed_texts, embedding_enabled, generate_answer
+from ..data.db import get_session
+from ..utils.response import fail, ok
+from ..data.models import KnowledgeBase
+from ..data.schemas import ChatIn, ChatOut, CitationOut
+from ..services.llm import chat_enabled, embed_texts, generate_answer
 from ..services.vector_store import search, vector_store_enabled
 
 router = APIRouter()
@@ -19,7 +19,7 @@ async def chat_api(payload: ChatIn):
     if not question:
         return fail("question required")
 
-    if not embedding_enabled():
+    if not chat_enabled():
         return fail("DEEPSEEK_API_KEY required")
     if not vector_store_enabled():
         return fail("QDRANT_URL required")
@@ -65,7 +65,11 @@ async def chat_api(payload: ChatIn):
     answer = llm
 
     citations = [
-        {"file_name": c["file_name"], "page_number": c["page_number"], "text": c["text"][:500]}
+        CitationOut(
+            file_name=str(c["file_name"]),
+            page_number=int(c["page_number"]),
+            text=str(c["text"])[:500],
+        )
         for c in retrieved
     ]
     return ok(ChatOut(answer=answer, citations=citations))
