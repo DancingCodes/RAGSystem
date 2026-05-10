@@ -32,8 +32,10 @@ jobs:
       - name: 打包 & 推送后端镜像
         uses: docker/build-push-action@v5
         with:
-          context: ./backend # 这里的路径必须对应你的子目录
+          context: ./backend
           push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             ghcr.io/dancingcodes/ragsystem-backend:${{ github.event.inputs.version }}
             ghcr.io/dancingcodes/ragsystem-backend:latest
