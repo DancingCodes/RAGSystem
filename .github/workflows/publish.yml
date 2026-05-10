@@ -1,0 +1,99 @@
+name: Manual Publish
+run-name: Deploy ${{ github.event.inputs.version }} to ${{ github.event.inputs.target }} by @${{ github.actor }}
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "选择发版目标"
+        required: true
+        default: "backend"
+        type: choice
+        options:
+          - backend
+          - web
+      version:
+        description: "版本号 (如 v1.0.0)"
+        required: true
+
+
+jobs:
+  # --- 后端构建任务 ---
+  build-backend:
+    if: ${{ github.event.inputs.target == 'backend' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 登录 GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 打包 & 推送后端镜像
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: |
+            ghcr.io/dancingcodes/ragsystem-backend:${{ github.event.inputs.version }}
+            ghcr.io/dancingcodes/ragsystem-backend:latest
+
+      - name: 远程部署
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/ragsystem
+            docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+            docker compose pull backend
+            docker compose up -d backend
+  # --- 前端构建任务 ---
+  build-web:
+    if: ${{ github.event.inputs.target == 'web'}}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 打包
+        run: |
+          cd web
+          npm install
+          npm run build
+          tar -czf out.tar.gz out/
+
+      - name: 发送到服务器
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "web/out.tar.gz"
+          target: "/opt/ragsystem/web"
+          strip_components: 1
+
+      - name: 远程部署与版本留存
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/ragsystem/web
+
+            mkdir -p backups
+
+            cp out.tar.gz backups/web-${{ github.event.inputs.version }}.tar.gz
+
+            tar -xzf out.tar.gz
+
+            rm out.tar.gz
