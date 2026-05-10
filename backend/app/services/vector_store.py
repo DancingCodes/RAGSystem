@@ -124,15 +124,15 @@ def search(
                 )
             ]
         )
-        res = client.search(
+        res = client.query_points(
             collection_name=_collection(),
-            query_vector=query_vector,
+            query=query_vector,
             query_filter=flt,
             limit=int(limit),
             with_payload=True,
         )
         out: list[VectorHit] = []
-        for p in res:
+        for p in res.points:
             out.append(VectorHit(id=int(p.id), score=float(p.score), payload=dict(p.payload or {})))
         return out
     except (ConnectionError, OSError, ValueError) as e:

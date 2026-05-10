@@ -1,6 +1,6 @@
 import json
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 
@@ -30,7 +30,7 @@ def chat_model() -> str:
 
 async def generate_answer_stream(
     *, question: str, context: str
-) -> AsyncGenerator[str | None, None]:
+) -> AsyncGenerator[Optional[str], None]:
     """Stream answer tokens from DeepSeek API."""
     if not chat_enabled():
         yield None
