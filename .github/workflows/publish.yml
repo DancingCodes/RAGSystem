@@ -35,8 +35,6 @@ jobs:
         with:
           context: ./backend
           push: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
           tags: |
             ghcr.io/dancingcodes/ragsystem-backend:${{ github.event.inputs.version }}
             ghcr.io/dancingcodes/ragsystem-backend:latest
