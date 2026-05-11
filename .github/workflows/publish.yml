@@ -23,12 +23,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: 登录 GHCR
+
+      - name: 登录 Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: 打包 & 推送后端镜像
         uses: docker/build-push-action@v5
@@ -36,8 +36,8 @@ jobs:
           context: ./backend
           push: true
           tags: |
-            ghcr.io/dancingcodes/ragsystem-backend:${{ github.event.inputs.version }}
-            ghcr.io/dancingcodes/ragsystem-backend:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/ragsystem-backend:${{ github.event.inputs.version }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/ragsystem-backend:latest
 
       - name: 远程部署
         uses: appleboy/ssh-action@v1.0.3
@@ -47,9 +47,10 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /opt/ragsystem
-            docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
             docker compose pull backend
             docker compose up -d backend
+
   # --- 前端构建任务 ---
   build-web:
     if: ${{ github.event.inputs.target == 'web'}}
